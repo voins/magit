@@ -1333,9 +1333,14 @@ Please see the manual for a complete description of Magit.
 
 (defun magit-insert-staged-changes ()
   (let ((magit-hide-diffs t))
-    (magit-insert-section 'staged "Staged changes:" 'magit-wash-diffs
-			  magit-collapse-threshold
-			  "git" "diff" "--cached")))
+    (if no-commit
+        (let ((null-tree (magit-shell "git mktree </dev/null")))
+          (magit-insert-section 'staged "Staged changes:" 'magit-wash-diffs
+                                magit-collapse-threshold
+                                "git" "diff" "--cached" null-tree))
+      (magit-insert-section 'staged "Staged changes:" 'magit-wash-diffs
+                            magit-collapse-threshold
+                            "git" "diff" "--cached"))))
 
 ;;; Logs and Commits
 
@@ -1469,7 +1474,10 @@ in log buffer."
   (magit-create-buffer-sections
     (magit-with-section 'status nil
       (let* ((branch (magit-get-current-branch))
-	     (remote (and branch (magit-get "branch" branch "remote"))))
+	     (remote (and branch (magit-get "branch" branch "remote")))
+	     (head (magit-shell
+                    "git log --max-count=1 --abbrev-commit --pretty=oneline"))
+	     (no-commit (string-match "fatal: bad default revision" head)))
 	(if remote
 	    (insert (format "Remote: %s %s\n"
 			    remote (magit-get "remote" remote "url"))))
@@ -1477,11 +1485,8 @@ in log buffer."
 			(propertize (or branch "(detached)")
 				    'face 'magit-branch)
 			(abbreviate-file-name default-directory)))
-	(insert
-	 (format
-	  "Head:   %s\n"
-	  (magit-shell
-	   "git log --max-count=1 --abbrev-commit --pretty=oneline")))
+        (insert (format "Head:   %s\n"
+                        (if no-commit "nothing commited (yet)" head)))
 	(let ((merge-heads (magit-file-lines ".git/MERGE_HEAD")))
 	  (if merge-heads
 	      (insert (format "Merging: %s\n"
@@ -1498,7 +1503,7 @@ in log buffer."
 	(magit-insert-pending-commits)
 	(when remote
 	  (magit-insert-unpulled-commits remote branch))
-	(let ((staged (magit-anything-staged-p)))
+	(let ((staged (or no-commit (magit-anything-staged-p))))
 	  (magit-insert-unstaged-changes
 	   (if staged "Unstaged changes:" "Changes:"))
 	  (if staged
