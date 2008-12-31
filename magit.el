@@ -242,7 +242,7 @@ Many Magit faces inherit from this one by default."
   (concat "'" (replace-regexp-in-string "'" "'\\''" str) "'"))
 
 (defun magit-format-commit (commit format)
-  (magit-shell "git log --max-count=1 --pretty=format:%s %s" 
+  (magit-shell "git --no-pager log --max-count=1 --pretty=format:%s %s" 
 	       format
 	       commit))
 
@@ -262,14 +262,14 @@ Many Magit faces inherit from this one by default."
       (insert text))))
 
 (defun magit-file-uptodate-p (file)
-  (eq (magit-shell-exit-code "git diff --quiet -- %s" file) 0))
+  (eq (magit-shell-exit-code "git --no-pager diff --quiet -- %s" file) 0))
 
 (defun magit-anything-staged-p ()
-  (not (eq (magit-shell-exit-code "git diff --quiet --cached") 0)))
+  (not (eq (magit-shell-exit-code "git --no-pager diff --quiet --cached") 0)))
 
 (defun magit-everything-clean-p ()
   (and (not (magit-anything-staged-p))
-       (eq (magit-shell-exit-code "git diff --quiet") 0)))
+       (eq (magit-shell-exit-code "git --no-pager diff --quiet") 0)))
 
 (defun magit-commit-parents (commit)
   (cdr (magit-shell-lines "git rev-list -1 --parents %s | tr ' ' '\n'"
@@ -1337,7 +1337,7 @@ Please see the manual for a complete description of Magit.
   (let ((magit-hide-diffs t))
     (magit-insert-section 'unstaged title 'magit-wash-diffs
 			  magit-collapse-threshold
-			  "git" "diff")))
+			  "git" "--no-pager" "diff")))
 
 (defun magit-insert-staged-changes ()
   (let ((magit-hide-diffs t))
@@ -1345,10 +1345,10 @@ Please see the manual for a complete description of Magit.
         (let ((null-tree (magit-shell "git mktree </dev/null")))
           (magit-insert-section 'staged "Staged changes:" 'magit-wash-diffs
                                 magit-collapse-threshold
-                                "git" "diff" "--cached" null-tree))
+                                "git" "--no-pager" "diff" "--cached" null-tree))
       (magit-insert-section 'staged "Staged changes:" 'magit-wash-diffs
                             magit-collapse-threshold
-                            "git" "diff" "--cached"))))
+                            "git" "--no-pager" "diff" "--cached"))))
 
 ;;; Logs and Commits
 
@@ -1411,7 +1411,7 @@ in log buffer."
   (magit-create-buffer-sections
     (magit-insert-section 'commitbuf nil
 			  'magit-wash-commit nil
-			  "git" "log" "--max-count=1"
+			  "git" "--no-pager" "log" "--max-count=1"
                           "--pretty=medium"
                           "--cc" "-p" commit)))
 
@@ -1475,14 +1475,14 @@ in log buffer."
   (magit-insert-section 'unpulled
 			"Unpulled commits:" 'magit-wash-log
 			nil
-			"git" "log" "--pretty=format:* %H %s"
+			"git" "--no-pager" "log" "--pretty=format:* %H %s"
 			(format "HEAD..%s/%s" remote branch)))
 
 (defun magit-insert-unpushed-commits (remote branch)
   (magit-insert-section 'unpushed
 			"Unpushed commits:" 'magit-wash-log
 			nil
-			"git" "log" "--pretty=format:* %H %s"
+			"git" "--no-pager" "log" "--pretty=format:* %H %s"
 			(format "%s/%s..HEAD" remote branch)))
 
 ;;; Status
@@ -1493,7 +1493,7 @@ in log buffer."
       (let* ((branch (magit-get-current-branch))
 	     (remote (and branch (magit-get "branch" branch "remote")))
 	     (head (magit-shell
-                    "git log --max-count=1 --abbrev-commit --pretty=oneline"))
+                    "git --no-pager log --max-count=1 --abbrev-commit --pretty=oneline"))
 	     (no-commit (string-match "fatal: bad default revision" head)))
 	(if remote
 	    (insert (format "Remote: %s %s\n"
@@ -1730,7 +1730,7 @@ in log buffer."
 	  (magit-with-section commit 'commit
 	    (magit-set-section-info commit)
 	    (insert (magit-shell
-		     "git log --max-count=1 --pretty=format:%s %s --"
+		     "git --no-pager log --max-count=1 --pretty=format:%s %s --"
 		     (if used ". %s" "* %s")
 		     commit)
 		    "\n")))))
@@ -1765,7 +1765,7 @@ in log buffer."
 	(magit-insert-section 'pending-changes
 			      "Pending changes"
 			      'magit-wash-diffs nil
-			      "git" "diff" "-R" orig)))))
+			      "git" "--no-pager" "diff" "-R" orig)))))
 
 (defun magit-rewrite-start (from &optional onto)
   (interactive (list (magit-read-rev "Rewrite from" (magit-default-rev))))
@@ -2130,7 +2130,7 @@ Prefix arg means justify as well."
     (magit-log-edit-set-field 
      'author
      (magit-format-commit commit "%an <%ae>, %ai"))
-    (magit-run-shell "git diff %s %s | git apply -" parent commit)))
+    (magit-run-shell "git --no-pager diff %s %s | git apply -" parent commit)))
 
 (defun magit-cherry-pick-commit (commit &optional noerase)
   (let ((parent-id (magit-choose-parent-id commit "cherry-pick")))
@@ -2198,13 +2198,13 @@ Prefix arg means justify as well."
 
 (defun magit-configure-have-graph ()
   (if (eq magit-have-graph 'unset)
-      (let ((res (magit-shell-exit-code "git log --graph --max-count=0")))
+      (let ((res (magit-shell-exit-code "git --no-pager log --graph --max-count=0")))
 	(message "result %s" res)
 	(setq magit-have-graph (eq res 0)))))
 
 (defun magit-configure-have-decorate ()
   (if (eq magit-have-decorate 'unset)
-      (let ((res (magit-shell-exit-code "git log --decorate --max-count=0")))
+      (let ((res (magit-shell-exit-code "git --no-pager log --decorate --max-count=0")))
 	(setq magit-have-decorate (eq res 0)))))
 
 (defun magit-refresh-log-buffer (range args have-graph have-decorate)
@@ -2212,7 +2212,7 @@ Prefix arg means justify as well."
     (apply #'magit-insert-section 'log
 	   (magit-rev-range-describe range "Commits")
 	   'magit-wash-log nil
-	   `("git" "log" "--max-count=1000" "--pretty=oneline"
+	   `("git" "--no-pager" "log" "--max-count=1000" "--pretty=oneline"
              ,@(if have-decorate (list "--decorate"))
 	     ,@(if have-graph (list "--graph"))
 	     ,args "--"))))
@@ -2239,7 +2239,7 @@ Prefix arg means justify as well."
     (magit-insert-section 'reflog
 			  (format "Local history of head %s" head)
 			  'magit-wash-log nil
-			  "git" "log" "--walk-reflogs"
+			  "git" "--no-pager" "log" "--walk-reflogs"
 			  "--max-count=1000"
 			  "--pretty=oneline" args)))
 
@@ -2263,7 +2263,7 @@ Prefix arg means justify as well."
     (magit-insert-section 'diffbuf
 			  (magit-rev-range-describe range "Changes")
 			  'magit-wash-diffs nil
-			  "git" "diff" args)))
+			  "git" "--no-pager" "diff" args)))
 
 (defun magit-diff (range)
   (interactive (list (magit-read-rev-range "Diff")))
