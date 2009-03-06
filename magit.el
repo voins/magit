@@ -2591,7 +2591,7 @@ Prefix arg means justify as well."
 	   'magit-wash-log
 	   `("log"
 	     ,(format "--max-count=%s" magit-log-cutoff-length)
-	     ,style
+	     ,@style
 	     ,@(if magit-have-decorate (list "--decorate"))
 	     ,@(if magit-have-graph (list "--graph"))
 	     ,args "--"))))
@@ -2605,7 +2605,7 @@ Prefix arg means justify as well."
 	 (args (magit-rev-range-to-git range)))
     (switch-to-buffer "*magit-log*")
     (magit-mode-init topdir 'log #'magit-refresh-log-buffer range
-		     "--pretty=oneline" args)))
+		     '("--pretty=oneline") args)))
 
 (defun magit-log-long (&optional arg)
   (interactive "P")
@@ -2616,7 +2616,7 @@ Prefix arg means justify as well."
 	 (args (magit-rev-range-to-git range)))
     (switch-to-buffer "*magit-log*")
     (magit-mode-init topdir 'log #'magit-refresh-log-buffer range
-		     "--stat" args)))
+		     '("--stat" "--pretty=medium") args)))
 
 ;;; Reflog
 
