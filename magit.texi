@@ -166,8 +166,28 @@ will switch to the status buffer of that repository.  Otherwise, it
 will prompt for a directory.  With a prefix argument, it will always
 prompt.
 
+You can set @code{magit-repo-dirs} to customize how
+@code{magit-status} asks for the repository to work on.  When
+@code{magit-repo-dirs} is nil, @code{magit-status} will simply ask for
+a directory.
+
 If you specify a directory that is not a Git repository, @kbd{M-x
-magit-status} will ask whether to create one.
+magit-status} will offer to initialize it as one.
+
+When @code{magit-repo-dirs} is not nil, it is treated as a list of
+directory names, and @code{magit-status} will find all Git
+repositories in those directories and offer them for completion.
+(Magit will only look @code{magit-repo-dirs-depth} levels deep,
+however.)
+
+With two prefix arguments, @code{magit-status} will always prompt for
+a raw directory.
+
+Thus, you would normally set @code{magit-repo-dirs} to the places
+where you keep most of your Git repositories and switch between them
+with @kbd{C-u M-x magit-status}.  If you want to go to a repository
+outside of your normal working areas, or if you want to create a new
+repository, you would use @kbd{C-u C-u M-x magit-status}.
 
 You need to explicitly refresh the status buffer when you have made
 changes to the repository from outside of Emacs.  You can type @kbd{g}
@@ -200,7 +220,12 @@ During a history rewriting session, the status buffer shows the
 
 Untracked files are shown in the @emph{Untracked files} section.
 
-You can add a untracked file to the staging area with @kbd{s}.
+You can add a untracked file to the staging area with @kbd{s}.  If
+point is on the @emph{Untracked files} section title when you it
+@kbd{s}, all untracked files are staged.
+
+Typing @kbd{C-u S} anywhere will also stage all untracked files,
+together with all changes to the tracked files.
 
 You can instruct Git to ignore them by typing @kbd{i}.  This will add
 the filename to the @code{.gitignore} file.  Typing @kbd{C-u i} will
@@ -208,7 +233,7 @@ ask you for the name of the file to ignore.  This is useful to ignore
 whole directories, for example.  The @kbd{I} command is similar to
 @kbd{i} but will add the file to @code{.git/info/exclude} instead.
 
-To delete a untracked file forever, use @kbd{k}.  If point is one the
+To delete a untracked file forever, use @kbd{k}.  If point is on the
 @emph{Untracked files} section title when you it @kbd{k}, all
 untracked files are deleted.
 
@@ -243,6 +268,9 @@ the changes, otherwise it is not.)
 
 To move all hunks of all diffs into the staging area in one go, type
 @kbd{S}.  To unstage everything, type @kbd{U}.
+
+Typing @kbd{C-u S} will stage all untracked files in addition to the
+changes to tracked files.
 
 You can discard uncommitted changes by moving point into a hunk and
 typing @kbd{k}.  The changes to discard are selected as with @kbd{s}
