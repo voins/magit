@@ -292,13 +292,17 @@ Many Magit faces inherit from this one by default."
 
 (defun magit-get-top-dir (cwd)
   (let ((cwd (expand-file-name cwd)))
-    (and (file-directory-p cwd)
-	 (let* ((default-directory cwd)
-		(magit-dir
-		 (magit-git-string "rev-parse --git-dir 2>/dev/null")))
-	   (and magit-dir
-		(file-name-as-directory
-		 (or (file-name-directory magit-dir) cwd)))))))
+    (when (file-directory-p cwd)
+      (let* ((default-directory cwd)
+	     (magit-dir
+	      (magit-git-string "rev-parse --git-dir 2>/dev/null")))
+	(when magit-dir
+	  (cond ((file-name-absolute-p magit-dir)
+		 (file-name-as-directory (file-name-directory magit-dir)))
+		((string= magit-dir ".git")
+		 (file-name-as-directory cwd))
+		((string= magit-dir ".")
+		 (file-name-as-directory (concat cwd "/..")))))))))
 
 (defun magit-get-ref (ref)
   (magit-git-string "symbolic-ref -q %s" ref))
@@ -1476,10 +1480,11 @@ Please see the manual for a complete description of Magit.
 
 (defun magit-wash-diff-section ()
   (cond ((looking-at "^\\* Unmerged path \\(.*\\)")
-	 (delete-region (point) (line-end-position))
-	 (insert "\tUnmerged " file "\n")
-	 (magit-set-section-info (list 'unmerged file nil))
-	 t)
+	 (let ((file (match-string-no-properties 1)))
+	   (delete-region (point) (line-end-position))
+	   (insert "\tUnmerged " file "\n")
+	   (magit-set-section-info (list 'unmerged file nil))
+	   t))
 	((looking-at "^diff")
 	 (let ((file (magit-diff-line-file))
 	       (end (save-excursion
@@ -1536,8 +1541,9 @@ Please see the manual for a complete description of Magit.
 	 nil)))
 
 (defun magit-wash-diff ()
-  (magit-with-section (magit-current-line) 'diff
-    (magit-wash-diff-section)))
+  (let ((magit-section-hidden-default magit-hide-diffs))
+    (magit-with-section (magit-current-line) 'diff
+      (magit-wash-diff-section))))
 
 (defun magit-diff-item-kind (diff)
   (car (magit-section-info diff)))
@@ -1574,6 +1580,7 @@ Please see the manual for a complete description of Magit.
   (let ((cmd magit-git-executable)
 	(args (append magit-git-standard-options 
 		      (list "diff")
+		      (list (magit-diff-U-arg))
 		      magit-diff-options
 		      (list "--" file))))
     (let ((p (point)))
@@ -1593,7 +1600,8 @@ Please see the manual for a complete description of Magit.
   (if (looking-at "\\(^[0-9-]+\\)\t\\([0-9-]+\\)\t\\(.*\\)$")
       (let ((added (string-to-number (match-string 1)))
 	    (deleted (string-to-number (match-string 2)))
-	    (file (match-string-no-properties 3)))
+	    (file (match-string-no-properties 3))
+	    (magit-section-hidden-default magit-hide-diffs))
 	(magit-with-section file 'diff
 	  (delete-region (point) (+ (line-end-position) 1))
 	  (if (or (not (magit-section-hidden magit-top-section))
