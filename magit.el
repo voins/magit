@@ -2357,15 +2357,6 @@ in log buffer."
 	(magit-process-popup-time 0))
     (magit-run* args nil nil nil t)))
 
-(defun magit-shell-command (command)
-  (interactive "sCommand: ")
-  (require 'pcomplete)
-  (let ((args (car (with-temp-buffer
-		     (insert command)
-		     (pcomplete-parse-buffer-arguments))))
-	(magit-process-popup-time 0))
-    (magit-run* args nil nil nil t)))
-
 (defun magit-read-remote (prompt def)
   (completing-read (if def
 		       (format "%s (default %s): " prompt def)
