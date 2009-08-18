@@ -338,7 +338,7 @@ Many Magit faces inherit from this one by default."
     (when (file-directory-p cwd)
       (let* ((default-directory cwd)
 	     (magit-dir
-	      (magit-git-string "rev-parse --git-dir 2>/dev/null")))
+	      (magit-git-string "rev-parse" "--git-dir")))
 	(when magit-dir
 	  (cond ((file-name-absolute-p magit-dir)
 		 (file-name-as-directory (file-name-directory magit-dir)))
