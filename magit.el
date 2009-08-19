@@ -334,18 +334,22 @@ Many Magit faces inherit from this one by default."
 		  dirs))))
 
 (defun magit-get-top-dir (cwd)
-  (let ((cwd (expand-file-name cwd)))
-    (when (file-directory-p cwd)
-      (let* ((default-directory cwd)
-	     (magit-dir
-	      (magit-git-string "rev-parse" "--git-dir")))
-	(when magit-dir
-	  (cond ((file-name-absolute-p magit-dir)
-		 (file-name-as-directory (file-name-directory magit-dir)))
-		((string= magit-dir ".git")
-		 (file-name-as-directory cwd))
-		((string= magit-dir ".")
-		 (file-name-as-directory (concat cwd "/..")))))))))
+  (let ((cwd (file-name-as-directory (expand-file-name cwd))))
+    (cond ((file-directory-p (concat cwd ".git"))
+	   (expand-file-name cwd))
+	  ((string-match "\\.git/?$" cwd)
+	   (expand-file-name cwd))
+	  ((file-directory-p cwd)
+	   (let* ((default-directory cwd)
+		  (dir (magit-git-string "rev-parse" "--git-dir")))
+	     (when dir
+	       (let ((dir (file-name-as-directory (file-name-directory dir))))
+		 (if (and (fboundp 'tramp-tramp-file-p)
+			  (tramp-tramp-file-p cwd))
+		     (with-parsed-tramp-file-name cwd tr
+		       (concat (substring cwd 0 (* -1 (length tr-localname)))
+			       dir))
+		     dir))))))))
 
 (defun magit-get-ref (ref)
   (magit-git-string "symbolic-ref" "-q" ref))
