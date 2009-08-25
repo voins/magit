@@ -1471,7 +1471,14 @@ Please see the manual for a complete description of Magit.
     nil))
 
 (defun magit-wash-untracked-files ()
-  (magit-wash-sequence #'magit-wash-untracked-file))
+  ;; Setting magit-old-top-section to nil speeds up washing: no time
+  ;; is wasted looking up the old visibility, which doesn't matter for
+  ;; untracked files.
+  ;;
+  ;; XXX - speed this up in a more general way.
+  ;;
+  (let ((magit-old-top-section nil))
+    (magit-wash-sequence #'magit-wash-untracked-file)))
 
 (defun magit-insert-untracked-files ()
   (magit-git-section 'untracked "Untracked files:"
@@ -1966,6 +1973,7 @@ in log buffer."
 	  (if rebase
 	      (insert (apply 'format "Rebasing: %s (%s of %s)\n" rebase))))
 	(insert "\n")
+        (magit-git-exit-code "update-index" "--refresh")
 	(magit-insert-untracked-files)
 	(magit-insert-stashes)
 	(magit-insert-topics)
