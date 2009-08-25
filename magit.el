@@ -342,7 +342,7 @@ Many Magit faces inherit from this one by default."
     (cond ((file-directory-p (concat cwd ".git"))
 	   (expand-file-name cwd))
 	  ((string-match "\\.git/?$" cwd)
-	   (expand-file-name cwd))
+	   (expand-file-name (concat cwd "/..")))
 	  ((file-directory-p cwd)
 	   (let* ((default-directory cwd)
 		  (dir (magit-git-string "rev-parse" "--git-dir")))
