@@ -262,7 +262,7 @@ Many Magit faces inherit from this one by default."
 (defun magit-git-string (&rest args)
   (magit-trim-line (magit-git-output args)))
 
-(defun magit-git-lines (&rest args)
+(defun magit-git-lines (&rest args)  
   (magit-split-lines (magit-git-output args)))
 
 (defun magit-git-exit-code (&rest args)
@@ -311,7 +311,7 @@ Many Magit faces inherit from this one by default."
 		   (push (cons key (car value)) result)
 		 (let ((sub (magit-remove-conflicts
 			     (mapcar (lambda (entry)
-				       (let ((dir (directory-file-name
+				       (let ((dir (directory-file-name 
 						   (subseq entry 0 (- (length key))))))
 					 (cons (concat (file-name-nondirectory dir) "/" key)
 					       entry)))
@@ -3220,7 +3220,7 @@ Prefix arg means justify as well."
 	(error "Cannot resolve %s" file))
     (with-current-buffer base-buffer
       (if (string-match "^[0-9]+ [0-9a-f]+ 1" merge-status)
-	  (insert (magit-git-string "cat-file" "blob"
+	  (insert (magit-git-string "cat-file" "blob" 
 				    (concat ":1:" file)))))
     (with-current-buffer our-buffer
       (if (string-match "^[0-9]+ [0-9a-f]+ 2" merge-status)
