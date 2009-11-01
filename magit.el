@@ -76,6 +76,11 @@
   :group 'magit
   :type '(repeat string))
 
+(defcustom magit-topgit-executable "tg"
+  "The name of the TopGit executable."
+  :group 'magit
+  :type 'string)
+
 (defcustom magit-repo-dirs nil
   "Directories containing Git repositories.
 Magit will look into these directories for Git repositories and offers them as choices for magit-status."
@@ -254,7 +259,7 @@ Many Magit faces inherit from this one by default."
 (defun magit-git-string (&rest args)
   (magit-trim-line (magit-git-output args)))
 
-(defun magit-git-lines (&rest args)  
+(defun magit-git-lines (&rest args)
   (magit-split-lines (magit-git-output args)))
 
 (defun magit-git-exit-code (&rest args)
@@ -302,7 +307,7 @@ Many Magit faces inherit from this one by default."
 		   (push (cons key (car value)) result)
 		 (let ((sub (magit-remove-conflicts
 			     (mapcar (lambda (entry)
-				       (let ((dir (directory-file-name 
+				       (let ((dir (directory-file-name
 						   (subseq entry 0 (- (length key))))))
 					 (cons (concat (file-name-nondirectory dir) "/" key)
 					       entry)))
@@ -1625,7 +1630,7 @@ Please see the manual for a complete description of Magit.
 
 (defun magit-insert-diff (file)
   (let ((cmd magit-git-executable)
-	(args (append magit-git-standard-options 
+	(args (append magit-git-standard-options
 		      (list "diff")
 		      (list (magit-diff-U-arg))
 		      magit-diff-options
@@ -2119,9 +2124,12 @@ in log buffer."
   (interactive (magit-read-create-branch-args))
   (if (and branch (not (string= branch ""))
 	   parent)
-      (magit-run-git "checkout" "-b"
-		     branch
-		     (magit-rev-to-git parent))))
+      (if (zerop (string-match "t/" branch))
+	  (magit-run* (list magit-topgit-executable "create"
+			    branch (magit-rev-to-git parent))
+		      nil nil nil t)
+	(magit-run-git "checkout" "-b"
+		       branch (magit-rev-to-git parent)))))
 
 ;;; Merging
 
@@ -2359,7 +2367,10 @@ in log buffer."
 			   (magit-read-rev (format "Pull from")))))
     (if (and branch (not config-branch))
 	(magit-set merge-branch "branch" branch "merge"))
-    (magit-run-git-async "pull" "-v")))
+    (if (file-exists-p ".topdeps")
+        (magit-run* (list magit-topgit-executable "update")
+                    nil nil nil t)
+      (magit-run-git-async "pull" "-v"))))
 
 (defun magit-shell-command (command)
   (interactive "sCommand: ")
@@ -3084,7 +3095,11 @@ Prefix arg means justify as well."
      (error "Can't discard this diff"))
     ((stash)
      (when (yes-or-no-p "Discard stash? ")
-       (magit-run-git "stash" "drop" info)))))
+       (magit-run-git "stash" "drop" info)))
+    ((topic)
+     (when (yes-or-no-p "Discard topic? ")
+       (magit-run* (list magit-topgit-executable "delete" "-f" info)
+		   nil nil nil t)))))
 
 (defun magit-visit-item ()
   (interactive)
@@ -3194,7 +3209,7 @@ Prefix arg means justify as well."
 	(error "Cannot resolve %s" file))
     (with-current-buffer base-buffer
       (if (string-match "^[0-9]+ [0-9a-f]+ 1" merge-status)
-	  (insert (magit-git-string "cat-file" "blob" 
+	  (insert (magit-git-string "cat-file" "blob"
 				    (concat ":1:" file)))))
     (with-current-buffer our-buffer
       (if (string-match "^[0-9]+ [0-9a-f]+ 2" merge-status)
