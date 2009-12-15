@@ -1017,7 +1017,8 @@ Many Magit faces inherit from this one by default."
 	(args (cdr cmd-and-args))
 	(dir default-directory)
 	(buf (get-buffer-create "*magit-process*"))
-	(successp nil))
+	(successp nil)
+	(process-connection-type nil))
     (magit-set-mode-line-process
      (magit-process-indicator-from-command cmd-and-args))
     (setq magit-process-client-buffer (current-buffer))
