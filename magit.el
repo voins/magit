@@ -299,14 +299,17 @@ Many Magit faces inherit from this one by default."
 	  (setq lines (cdr lines)))
       (nreverse lines))))
 
+(defun magit-git-insert (args)
+  (apply #'process-file
+	 magit-git-executable
+	 nil (list t nil) nil
+	 (append magit-git-standard-options args)))
+
 (defun magit-git-output (args)
   (with-output-to-string
     (with-current-buffer
         standard-output
-      (apply #'process-file
-	     magit-git-executable
-	     nil (list t nil) nil
-	     args))))
+      (magit-git-insert args))))
 
 (defun magit-git-string (&rest args)
   (magit-trim-line (magit-git-output args)))
@@ -315,7 +318,8 @@ Many Magit faces inherit from this one by default."
   (magit-split-lines (magit-git-output args)))
 
 (defun magit-git-exit-code (&rest args)
-  (apply #'process-file magit-git-executable nil nil nil args))
+  (apply #'process-file magit-git-executable nil nil nil
+	 (append magit-git-standard-options args)))
 
 (defun magit-file-lines (file)
   (when (file-exists-p file)
@@ -708,7 +712,7 @@ Many Magit faces inherit from this one by default."
 		(insert (propertize buffer-title 'face 'magit-section-title)
 			"\n"))
 	    (setq body-beg (point))
-	    (apply 'process-file cmd nil t nil args)
+	    (apply 'process-file cmd nil t nil (append magit-git-standard-options args))
 	    (if (not (eq (char-before) ?\n))
 		(insert "\n"))
 	    (if washer
@@ -1074,7 +1078,7 @@ Many Magit faces inherit from this one by default."
 		"\n")
 	(cond (nowait
 	       (setq magit-process
-		     (apply 'start-process cmd buf cmd args))
+		     (apply 'start-file-process cmd buf cmd args))
 	       (set-process-sentinel magit-process 'magit-process-sentinel)
 	       (set-process-filter magit-process 'magit-process-filter)
 	       (when input
@@ -1107,7 +1111,7 @@ Many Magit faces inherit from this one by default."
 	       (magit-need-refresh magit-process-client-buffer))
 	      (t
 	       (setq successp
-		     (equal (apply 'call-process cmd nil buf nil args) 0))
+		     (equal (apply 'process-file cmd nil buf nil args) 0))
 	       (magit-set-mode-line-process nil)
 	       (magit-need-refresh magit-process-client-buffer))))
       (or successp
@@ -1690,7 +1694,7 @@ Please see the manual for a complete description of Magit.
 		      magit-diff-options
 		      (list "--" file))))
     (let ((p (point)))
-      (apply 'process-file cmd nil t nil args)
+      (magit-git-insert args)
       (if (not (eq (char-before) ?\n))
 	  (insert "\n"))
       (save-restriction
