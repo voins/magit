@@ -81,6 +81,11 @@
   :group 'magit
   :type '(repeat string))
 
+(defcustom magit-topgit-executable "tg"
+  "The name of the TopGit executable."
+  :group 'magit
+  :type 'string)
+
 (defcustom magit-repo-dirs nil
   "Directories containing Git repositories.
 Magit will look into these directories for Git repositories and offers them as choices for magit-status."
@@ -180,6 +185,27 @@ Many Magit faces inherit from this one by default."
   "Face for lines in a diff that have been deleted."
   :group 'magit)
 
+(defface magit-log-graph
+  '((((class color) (background light))
+     :foreground "grey11")
+    (((class color) (background dark))
+     :foreground "grey30"))
+  "Face for the graph element of the log output."
+  :group 'magit)
+
+(defface magit-log-sha1
+  '((((class color) (background light))
+     :foreground "firebrick")
+    (((class color) (background dark))
+     :foreground "tomato"))
+  "Face for the sha1 element of the log output."
+  :group 'magit)
+
+(defface magit-log-message
+  '((t))
+  "Face for the message element of the log output."
+  :group 'magit)
+
 (defface magit-item-highlight
   '((((class color) (background light))
      :background "gray95")
@@ -204,13 +230,44 @@ Many Magit faces inherit from this one by default."
   "Face for git tag labels shown in log buffer."
   :group 'magit)
 
-(defface magit-log-head-label
+(defface magit-log-head-label-remote
   '((((class color) (background light))
-     :background "spring green")
+     :box t
+     :background "Grey85"
+     :foreground "OliveDrab4")
     (((class color) (background dark))
-     :background "DarkGreen"))
-  "Face for branch head labels shown in log buffer."
+     :box t
+     :background "Grey11"
+     :foreground "DarkSeaGreen2"))
+  "Face for remote branch head labels shown in log buffer."
   :group 'magit)
+
+(defface magit-log-head-label-tags
+  '((((class color) (background light))
+     :box t
+     :background "Grey85"
+     :foreground "VioletRed1")
+    (((class color) (background dark))
+     :box t
+     :background "Grey13"
+     :foreground "khaki1"))
+  "Face for tag labels shown in log buffer."
+  :group 'magit)
+
+(defface magit-log-head-label-local
+  '((((class color) (background light))
+     :box t
+     :background "Grey85"
+     :foreground "LightSkyBlue4")
+    (((class color) (background dark))
+     :box t
+     :background "Grey13"
+     :foreground "LightSkyBlue1"))
+  "Face for local branch head labels shown in log buffer."
+  :group 'magit)
+
+(defvar magit-completing-read 'completing-read
+  "Function to be called when requesting input from the user.")
 
 ;;; Macros
 
@@ -262,7 +319,7 @@ Many Magit faces inherit from this one by default."
 (defun magit-git-string (&rest args)
   (magit-trim-line (magit-git-output args)))
 
-(defun magit-git-lines (&rest args)  
+(defun magit-git-lines (&rest args)
   (magit-split-lines (magit-git-output args)))
 
 (defun magit-git-exit-code (&rest args)
@@ -311,7 +368,7 @@ Many Magit faces inherit from this one by default."
 		   (push (cons key (car value)) result)
 		 (let ((sub (magit-remove-conflicts
 			     (mapcar (lambda (entry)
-				       (let ((dir (directory-file-name 
+				       (let ((dir (directory-file-name
 						   (subseq entry 0 (- (length key))))))
 					 (cons (concat (file-name-nondirectory dir) "/" key)
 					       entry)))
@@ -379,7 +436,7 @@ Many Magit faces inherit from this one by default."
 (defun magit-read-top-dir (rawp)
   (if (and (not rawp) magit-repo-dirs)
       (let* ((repos (magit-list-repos magit-repo-dirs))
-	     (reply (completing-read "Git repository: "
+	     (reply (funcall magit-completing-read "Git repository: "
 				     (magit-list-repos magit-repo-dirs))))
 	(file-name-as-directory
 	 (cdr (assoc reply repos))))
@@ -466,7 +523,7 @@ Many Magit faces inherit from this one by default."
 		     (format "%s (default %s): " prompt def)
 		   (format "%s: " prompt)))
 	 (interesting-refs (magit-list-interesting-refs))
-	 (reply (completing-read prompt interesting-refs
+	 (reply (funcall magit-completing-read prompt interesting-refs
 				 nil nil nil nil def))
 	 (rev (or (cdr (assoc reply interesting-refs)) reply)))
     (if (string= rev "")
@@ -1211,6 +1268,7 @@ Many Magit faces inherit from this one by default."
     (define-key map (kbd "e") 'magit-interactive-resolve-item)
     (define-key map (kbd "N r") 'magit-svn-rebase)
     (define-key map (kbd "N c") 'magit-svn-dcommit)
+    (define-key map (kbd "N f") 'magit-svn-find-rev)
     (define-key map (kbd "R") 'magit-rebase-step)
     (define-key map (kbd "r s") 'magit-rewrite-start)
     (define-key map (kbd "r t") 'magit-rewrite-stop)
@@ -1622,7 +1680,8 @@ Please see the manual for a complete description of Magit.
 	 (let ((n-columns (1- (length (match-string 1))))
 	       (head (match-string 0)))
 	   (magit-with-section head 'hunk
-	     (magit-put-line-property 'face 'magit-diff-hunk-header)
+	     (add-text-properties (match-beginning 0) (match-end 0)
+				  '(face magit-diff-hunk-header))
 	     (forward-line)
 	     (while (not (or (eobp)
 			     (looking-at "^diff\\|^@@")))
@@ -1643,7 +1702,8 @@ Please see the manual for a complete description of Magit.
 
 (defun magit-insert-diff (file)
   (let ((cmd magit-git-executable)
-	(args (append (list "diff")
+	(args (append magit-git-standard-options
+		      (list "diff")
 		      (list (magit-diff-U-arg))
 		      magit-diff-options
 		      (list "--" file))))
@@ -1822,50 +1882,76 @@ Please see the manual for a complete description of Magit.
 
 ;;; Logs and Commits
 
-(defun magit-parse-log-ref (refname)
-  "Return shortened and propertized version of full REFNAME, like
-\"refs/remotes/origin/master\"."
-  (let ((face 'magit-log-head-label))
-    (cond ((string-match "^\\(tag: +\\)?refs/tags/\\(.+\\)" refname)
-	   (setq refname (match-string 2 refname)
-		 face 'magit-log-tag-label))
-	  ((string-match "^refs/remotes/\\(.+\\)" refname)
-	   (setq refname (match-string 1 refname)))
-	  ((string-match "[^/]+$" refname)
-	   (setq refname (match-string 0 refname))))
-    (propertize refname 'face face)))
+(defvar magit-log-oneline-re
+  (concat
+   "^\\([_\\*|/ ]+\\)"           ; graph   (1)
+   "\\(?:"
+   "\\([0-9a-fA-F]\\{40\\}\\) "  ; sha1    (2)
+   "\\(?:\\((.+)\\) \\)?"        ; refs    (3)
+   "\\(.*\\)"                    ; msg     (4)
+   "\\)?$")
+  "Regexp used to extract elements of git log output with
+--pretty=oneline.")
 
-(defun magit-parse-log-refs (refstring)
-  "Parse REFSTRING annotation from `git log --decorate'
-output (for example: \"refs/remotes/origin/master,
-refs/heads/master\") and return prettified string for displaying
-in log buffer."
-  (mapconcat 'identity
-	     (mapcar 'magit-parse-log-ref
-		     (remove-if (lambda (refname)
-				  (string-match "/HEAD$" refname))
-				(reverse (split-string refstring ", *" t))))
-	     " - "))
+(defvar magit-present-log-line-function 'magit-present-log-line
+  "The function to use when generating a log line. It takes four
+args: CHART, SHA1, REFS and MESSAGE. The function must return a
+string which will represent the log line.")
+
+(defun magit-present-log-line (graph sha1 refs message)
+  "The default log line generator."
+  (let* ((ref-re "\\(?:tag: \\)?refs/\\(tags\\|remotes\\|heads\\)/\\(.+\\)")
+	 (string-refs
+	  (when refs
+	    (concat (mapconcat
+		     (lambda (r)
+		       (propertize
+			(if (string-match ref-re r)
+			    (match-string 2 r)
+			  r)
+			'face (cond
+			       ((string= (match-string 1 r) "remotes")
+				'magit-log-head-label-remote)
+			       ((string= (match-string 1 r) "tags")
+				'magit-log-head-label-tags)
+				((string= (match-string 1 r) "heads")
+				 'magit-log-head-label-local))))
+		       refs
+		       " ")
+		     " "))))
+	 (concat
+	  (if sha1
+	      (propertize (substring sha1 0 8) 'face 'magit-log-sha1)
+	    (insert-char ? 8))
+	  " "
+	  (propertize graph 'face 'magit-log-graph)
+	  string-refs
+	  (when message
+	    (propertize message 'face 'magit-log-message)))))
 
 (defun magit-wash-log-line ()
-  (if (and (search-forward-regexp "[0-9a-fA-F]\\{40\\}" (line-end-position) t)
-	   (goto-char (match-beginning 0))
-	   (not (looking-back "commit ")))
-      (let ((commit (match-string-no-properties 0)))
-	(delete-region (match-beginning 0) (match-end 0))
-	(fixup-whitespace)
-	(goto-char (line-beginning-position))
-	(when (search-forward-regexp "^[|*\\/ ]+\\((\\(tag:.+?\\|refs/.+?\\))\\)"
-				     (line-end-position) t)
-	  (let ((refstring (match-string-no-properties 2)))
-	    (delete-region (match-beginning 1) (match-end 1))
-	    (insert (magit-parse-log-refs refstring)))
-	  (goto-char (line-beginning-position)))
-	(magit-with-section commit 'commit
-	  (magit-set-section-info commit)
-	  (forward-line)))
-    (forward-line))
-  t)
+  (beginning-of-line)
+  (let ((line-re magit-log-oneline-re))
+    (cond
+     ((looking-at magit-log-oneline-re)
+      (let ((chart (match-string 1))
+	    (sha1 (match-string 2))
+	    (msg (match-string 4))
+	    (refs (when (match-string 3)
+		    (remove-if (lambda (s)
+				 (string= s "tag:"))
+			       (split-string (match-string 3) "[(), ]" t)))))
+	(delete-region (point-at-bol) (point-at-eol))
+	(insert (magit-present-log-line chart sha1 refs msg))
+	(goto-char (point-at-bol))
+	(if sha1
+	  (magit-with-section sha1 'commit
+	    (magit-set-section-info sha1)
+	    (forward-line))
+	  (forward-line))))
+     (t
+      (forward-line)))
+    t))
 
 (defun magit-wash-log ()
   (let ((magit-old-top-section nil))
@@ -1874,9 +1960,12 @@ in log buffer."
 (defvar magit-currently-shown-commit nil)
 
 (defun magit-wash-commit ()
-  (cond ((search-forward-regexp "^diff" nil t)
-	 (goto-char (match-beginning 0))
-	 (magit-wash-diffs))))
+  (when (looking-at "^commit \\([0-9a-fA-F]\\{40\\}\\)")
+    (add-text-properties (match-beginning 1) (match-end 1)
+			 '(face magit-log-sha1)))
+  (when (search-forward-regexp "^diff" nil t)
+    (goto-char (match-beginning 0))
+    (magit-wash-diffs)))
 
 (defun magit-refresh-commit-buffer (commit)
   (magit-create-buffer-sections
@@ -1952,38 +2041,46 @@ in log buffer."
 		     "log" "--pretty=format:* %H %s"
 		     (format "%s/%s..HEAD" remote branch)))
 
-(defun magit-insert-unpulled-svn-commits ()
+(defun magit-insert-unpulled-svn-commits (&optional use-cache)
   (magit-git-section 'svn-unpulled
 		     "Unpulled commits (SVN):" 'magit-wash-log
 		     "log" "--pretty=format:* %H %s"
-		     (format "HEAD..%s" (magit-get-svn-ref))))
+		     (format "HEAD..%s" (magit-get-svn-ref use-cache))))
 
-(defun magit-insert-unpushed-svn-commits ()
+(defun magit-insert-unpushed-svn-commits (&optional use-cache)
   (magit-git-section 'svn-unpushed
 		     "Unpushed commits (SVN):" 'magit-wash-log
 		     "log" "--pretty=format:* %H %s"
-		     (format "%s..HEAD" (magit-get-svn-ref))))
+		     (format "%s..HEAD" (magit-get-svn-ref use-cache))))
 
 ;;; Status
+
+(defun magit-remote-string (remote svn-info)
+  (if remote
+      (concat remote " " (magit-get "remote" remote "url"))
+    (when svn-info
+      (concat (cdr (assoc 'url svn-info))
+	      " @ "
+	      (cdr (assoc 'revision svn-info))))))
 
 (defun magit-refresh-status ()
   (magit-create-buffer-sections
     (magit-with-section 'status nil
       (let* ((branch (magit-get-current-branch))
 	     (remote (and branch (magit-get "branch" branch "remote")))
-             (svn-enabled (magit-svn-enabled))
+	     (svn-info (magit-get-svn-ref-info))
+	     (remote-string (magit-remote-string remote svn-info))
 	     (head (magit-git-string
 		    "log" "--max-count=1" "--abbrev-commit" "--pretty=oneline"))
 	     (no-commit (not head)))
-	(if remote
-	    (insert (format "Remote: %s %s\n"
-			    remote (magit-get "remote" remote "url"))))
+	(when remote-string
+	  (insert "Remote: " remote-string "\n"))
 	(insert (format "Local:  %s %s\n"
 			(propertize (or branch "(detached)")
 				    'face 'magit-branch)
 			(abbreviate-file-name default-directory)))
-        (insert (format "Head:   %s\n"
-                        (if no-commit "nothing commited (yet)" head)))
+	(insert (format "Head:   %s\n"
+			(if no-commit "nothing commited (yet)" head)))
 	(let ((merge-heads (magit-file-lines ".git/MERGE_HEAD")))
 	  (if merge-heads
 	      (insert (format "Merging: %s\n"
@@ -1994,7 +2091,7 @@ in log buffer."
 	  (if rebase
 	      (insert (apply 'format "Rebasing: %s (%s of %s)\n" rebase))))
 	(insert "\n")
-        (magit-git-exit-code "update-index" "--refresh")
+	(magit-git-exit-code "update-index" "--refresh")
 	(magit-insert-untracked-files)
 	(magit-insert-stashes)
 	(magit-insert-topics)
@@ -2002,8 +2099,8 @@ in log buffer."
 	(magit-insert-pending-commits)
 	(when remote
 	  (magit-insert-unpulled-commits remote branch))
-        (when svn-enabled
-          (magit-insert-unpulled-svn-commits))
+	(when svn-info
+	  (magit-insert-unpulled-svn-commits t))
 	(let ((staged (or no-commit (magit-anything-staged-p))))
 	  (magit-insert-unstaged-changes
 	   (if staged "Unstaged changes:" "Changes:"))
@@ -2011,8 +2108,8 @@ in log buffer."
 	      (magit-insert-staged-changes no-commit)))
 	(when remote
 	  (magit-insert-unpushed-commits remote branch))
-        (when svn-enabled
-          (magit-insert-unpushed-svn-commits))))))
+	(when svn-info
+	  (magit-insert-unpushed-svn-commits t))))))
 
 (defun magit-init (dir)
   "Initialize git repository in specified directory"
@@ -2136,7 +2233,7 @@ in log buffer."
   (interactive (magit-read-create-branch-args))
   (if (and branch (not (string= branch ""))
 	   parent)
-      (if (file-exists-p ".topdeps")
+      (if (zerop (string-match "t/" branch))
 	  (magit-run* (list magit-topgit-executable "create"
 			    branch (magit-rev-to-git parent))
 		      nil nil nil t)
@@ -2151,9 +2248,18 @@ in log buffer."
 	(magit-section-info sec))))
 
 (defun magit-manual-merge (rev)
-  (interactive (list (magit-read-rev "Manually merge" (magit-guess-branch))))
+  "Merge (without commiting) REV. Given a prefix-arg then the
+merge will be squashed."
+  (interactive
+   (list (magit-read-rev (concat "Manually merge"
+				 (when current-prefix-arg
+				   " (squashed)"))
+			 (magit-guess-branch))))
   (if rev
-      (magit-run-git "merge" "--no-ff" "--no-commit"
+      (magit-run-git "merge" "--no-commit"
+		     (if current-prefix-arg
+			 "--squash"
+		       "--no-ff")
 		     (magit-rev-to-git rev))))
 
 (defun magit-automatic-merge (rev)
@@ -2201,6 +2307,23 @@ in log buffer."
 
 ;; git svn commands
 
+(defun magit-svn-find-rev (rev &optional branch)
+  (interactive
+   (list (read-input "SVN revision: ")
+         (if current-prefix-arg
+             (read-input "In branch: "))))
+  (let* ((sha (apply 'magit-git-string
+                     `("svn"
+                       "find-rev"
+                       ,(concat "r" rev)
+                       ,@(when branch (list branch))))))
+    (if sha
+        (magit-show-commit
+         (magit-with-section sha 'commit
+           (magit-set-section-info sha)
+           sha))
+      (error "Revision %s could not be mapped to a commit" rev))))
+
 (defun magit-svn-rebase ()
   (interactive)
   (magit-run-git-async "svn" "rebase"))
@@ -2210,15 +2333,50 @@ in log buffer."
   (magit-run-git-async "svn" "dcommit"))
 
 (defun magit-svn-enabled ()
-  (not (null (magit-get-svn-ref))))
+  (not (null (magit-get-svn-ref-info))))
 
-(defun magit-get-svn-ref ()
-  (cond ((magit-ref-exists-p "refs/remotes/git-svn")
-	 "refs/remotes/git-svn")
-	((magit-ref-exists-p "refs/remotes/trunk")
-	 "refs/remotes/trunk")
-	(t
-	 nil)))
+(defvar magit-get-svn-ref-info-cache nil
+  "As `magit-get-svn-ref-info' might be considered a quite
+  expensive operation a cache is taken so that `magit-status'
+  doesn't repeatedly call it.")
+
+(defun magit-get-svn-ref-info (&optional use-cache)
+  "Gather details about the current git-svn repository (nil if
+there isn't one). Keys of the alist are ref-path, trunk-ref-name
+and local-ref-name. If USE-CACHE is non-nil then return the value
+of `magit-get-svn-ref-info-cache'."
+  (if use-cache
+      magit-get-svn-ref-info-cache
+    (let* ((fetch (magit-get "svn-remote" "svn" "fetch"))
+           (branches (magit-get "svn-remote" "svn" "fetch"))
+           (url)
+           (revision))
+      (when fetch
+        (setq magit-get-svn-ref-info-cache
+              (list
+               (cons 'ref-path (file-name-directory
+                                (cadr (split-string fetch ":"))))
+               (cons 'trunk-ref-name (file-name-nondirectory
+                                      (cadr (split-string fetch ":"))))
+               ;; get the local ref from the log. This is actually
+               ;; the way that git-svn does it.
+               (cons 'local-ref-name
+                     (with-temp-buffer
+                       (insert (magit-git-string "log" "--first-parent"))
+                       (goto-char (point-min))
+                       (when (re-search-forward "git-svn-id: \\(.+/\\(.+?\\)\\)@\\([0-9]+\\)" nil t)
+                         (setq url (match-string 1)
+                               revision (match-string 3))
+                         (match-string 2))))
+               (cons 'revision revision)
+               (cons 'url url)))))))
+
+(defun magit-get-svn-ref (&optional use-cache)
+  "Get the best guess remote ref for the current git-svn based
+branch."
+  (let ((info (magit-get-svn-ref-info use-cache)))
+    (concat (cdr (assoc 'ref-path info))
+	    (cdr (assoc 'local-ref-name info)))))
 
 ;;; Resetting
 
@@ -2373,16 +2531,16 @@ in log buffer."
 
 (defun magit-pull ()
   (interactive)
-  (if (file-exists-p ".topdeps")
-      (magit-run* (list magit-topgit-executable "update")
-		  nil nil nil t)
-      (let* ((branch (magit-get-current-branch))
-	     (config-branch (and branch (magit-get "branch" branch "merge")))
-	     (merge-branch (or config-branch
-			       (magit-read-rev (format "Pull from")))))
-	(if (and branch (not config-branch))
-	    (magit-set merge-branch "branch" branch "merge"))
-	(magit-run-git-async "pull" "-v"))))
+  (let* ((branch (magit-get-current-branch))
+	 (config-branch (and branch (magit-get "branch" branch "merge")))
+	 (merge-branch (or config-branch
+			   (magit-read-rev (format "Pull from")))))
+    (if (and branch (not config-branch))
+	(magit-set merge-branch "branch" branch "merge"))
+    (if (file-exists-p ".topdeps")
+        (magit-run* (list magit-topgit-executable "update")
+                    nil nil nil t)
+      (magit-run-git-async "pull" "-v"))))
 
 (defun magit-shell-command (command)
   (interactive "sCommand: ")
@@ -2394,7 +2552,7 @@ in log buffer."
     (magit-run* args nil nil nil t)))
 
 (defun magit-read-remote (prompt def)
-  (completing-read (if def
+  (funcall magit-completing-read (if def
 		       (format "%s (default %s): " prompt def)
 		     (format "%s: " prompt))
 		   (magit-git-lines "remote")
@@ -3221,7 +3379,7 @@ Prefix arg means justify as well."
 	(error "Cannot resolve %s" file))
     (with-current-buffer base-buffer
       (if (string-match "^[0-9]+ [0-9a-f]+ 1" merge-status)
-	  (insert (magit-git-string "cat-file" "blob" 
+	  (insert (magit-git-string "cat-file" "blob"
 				    (concat ":1:" file)))))
     (with-current-buffer our-buffer
       (if (string-match "^[0-9]+ [0-9a-f]+ 2" merge-status)
@@ -3263,6 +3421,5 @@ Prefix arg means justify as well."
   (magit-section-action (item info "resolv")
     ((diff)
      (magit-interactive-resolve (cadr info)))))
-
 
 (provide 'magit)
