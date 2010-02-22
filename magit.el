@@ -71,11 +71,6 @@
   :group 'magit
   :type 'string)
 
-(defcustom magit-topgit-executable "tg"
-  "The name of the TopGit executable."
-  :group 'magit
-  :type 'string)
-
 (defcustom magit-git-standard-options '("--no-pager")
   "Standard options when running Git."
   :group 'magit
