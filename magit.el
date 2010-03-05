@@ -2361,27 +2361,30 @@ of `magit-get-svn-ref-info-cache'."
       magit-get-svn-ref-info-cache
     (let* ((fetch (magit-get "svn-remote" "svn" "fetch"))
            (branches (magit-get "svn-remote" "svn" "fetch"))
+           (src-url (magit-get "svn-remote" "svn" "url"))
            (url)
            (revision))
       (when fetch
-        (setq magit-get-svn-ref-info-cache
-              (list
-               (cons 'ref-path (file-name-directory
-                                (cadr (split-string fetch ":"))))
-               (cons 'trunk-ref-name (file-name-nondirectory
-                                      (cadr (split-string fetch ":"))))
-               ;; get the local ref from the log. This is actually
-               ;; the way that git-svn does it.
-               (cons 'local-ref-name
-                     (with-temp-buffer
-                       (insert (magit-git-string "log" "--first-parent"))
-                       (goto-char (point-min))
-                       (when (re-search-forward "git-svn-id: \\(.+/\\(.+?\\)\\)@\\([0-9]+\\)" nil t)
-                         (setq url (match-string 1)
-                               revision (match-string 3))
-                         (match-string 2))))
-               (cons 'revision revision)
-               (cons 'url url)))))))
+        (let* ((ref (cadr (split-string fetch ":")))
+               (ref-path (file-name-directory ref))
+               (trunk-ref-name (file-name-nondirectory ref)))
+          (setq magit-get-svn-ref-info-cache
+                (list
+                 (cons 'ref-path ref-path)
+                 (cons 'trunk-ref-name trunk-ref-name)
+                 ;; get the local ref from the log. This is actually
+                 ;; the way that git-svn does it.
+                 (cons 'local-ref-name
+                       (with-temp-buffer
+                         (insert (magit-git-string "log" "--first-parent"))
+                         (goto-char (point-min))
+                         (when (re-search-forward "git-svn-id: \\(.+/\\(.+?\\)\\)@\\([0-9]+\\)" nil t)
+                           (setq url (match-string 1)
+                                 revision (match-string 3))
+                           (if (equal url src-url) trunk-ref-name
+                             (match-string 2)))))
+                 (cons 'revision revision)
+                 (cons 'url url))))))))
 
 (defun magit-get-svn-ref (&optional use-cache)
   "Get the best guess remote ref for the current git-svn based
