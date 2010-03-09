@@ -2363,6 +2363,7 @@ merge will be squashed."
       (let* ((pats (split-string (pop branches) ":"))
              (src (replace-regexp-in-string "\\*" "\\\\(.*\\\\)" (car pats)))
              (dst (replace-regexp-in-string "\\*" "\\\\1" (cadr pats)))
+             (base-url (replace-regexp-in-string "\\+" "\\\\+" base-url))
              (pat1 (concat "^" src "$"))
              (pat2 (cond ((equal src "") (concat "^" base-url "$"))
                          (t (concat "^" base-url "/" src "$")))))
