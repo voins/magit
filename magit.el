@@ -264,6 +264,10 @@ Many Magit faces inherit from this one by default."
 (defvar magit-completing-read 'completing-read
   "Function to be called when requesting input from the user.")
 
+(defvar magit-omit-untracked-dir-contents nil
+  "When non-nil magit will only list an untracked directory, not
+  its contents.")
+
 ;;; Macros
 
 (defmacro magit-with-refresh (&rest body)
@@ -1563,9 +1567,13 @@ Please see the manual for a complete description of Magit.
     (magit-wash-sequence #'magit-wash-untracked-file)))
 
 (defun magit-insert-untracked-files ()
-  (magit-git-section 'untracked "Untracked files:"
-		     'magit-wash-untracked-files
-		     "ls-files" "-t" "--others" "--exclude-standard"))
+  (apply 'magit-git-section
+         `(untracked
+           "Untracked files:"
+           magit-wash-untracked-files
+           "ls-files" "-t" "--others" "--exclude-standard"
+           ,@(when magit-omit-untracked-dir-contents
+               '("--directory")))))
 
 ;;; Diffs and Hunks
 
@@ -1995,7 +2003,10 @@ string which will represent the log line.")
     (setq commit (magit-section-info commit)))
   (let ((dir default-directory)
 	(buf (get-buffer-create "*magit-commit*")))
-    (cond ((equal magit-currently-shown-commit commit)
+    (cond ((and (equal magit-currently-shown-commit commit)
+		;; if it's empty then the buffer was killed
+		(with-current-buffer buf
+		  (> (length (buffer-string)) 1)))
 	   (let ((win (get-buffer-window buf)))
 	     (cond ((not win)
 		    (display-buffer buf))
@@ -2928,7 +2939,10 @@ Prefix arg means justify as well."
 
 (defun magit-stash (description)
   (interactive "sStash description: ")
-  (magit-run-git "stash" "save" description))
+  (apply 'magit-run-git `("stash"
+			  "save"
+			  ,@(when current-prefix-arg '("--keep-index"))
+			  ,description)))
 
 (defun magit-stash-snapshot ()
   (interactive)
