@@ -3264,6 +3264,8 @@ Prefix arg means justify as well."
     (with-temp-buffer
       (insert-file-contents ignore-file)
       (goto-char (point-max))
+      (unless (bolp)
+	(insert "\n"))
       (insert "/" file "\n")
       (write-region nil nil ignore-file))
     (magit-need-refresh)))
