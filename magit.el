@@ -249,6 +249,13 @@ Many Magit faces inherit from this one by default."
   "Face for tag labels shown in log buffer."
   :group 'magit)
 
+(defvar magit-completing-read 'completing-read
+  "Function to be called when requesting input from the user.")
+
+(defvar magit-omit-untracked-dir-contents nil
+  "When non-nil magit will only list an untracked directory, not
+  its contents.")
+
 (defface magit-log-head-label-local
   '((((class color) (background light))
      :box t
@@ -260,13 +267,6 @@ Many Magit faces inherit from this one by default."
      :foreground "LightSkyBlue1"))
   "Face for local branch head labels shown in log buffer."
   :group 'magit)
-
-(defvar magit-completing-read 'completing-read
-  "Function to be called when requesting input from the user.")
-
-(defvar magit-omit-untracked-dir-contents nil
-  "When non-nil magit will only list an untracked directory, not
-  its contents.")
 
 ;;; Macros
 
@@ -1917,7 +1917,7 @@ Please see the manual for a complete description of Magit.
    "^\\([_\\*|/ ]+\\)"           ; graph   (1)
    "\\(?:"
    "\\([0-9a-fA-F]\\{40\\}\\) "  ; sha1    (2)
-   "\\(?:\\((.+)\\) \\)?"        ; refs    (3)
+   "\\(?:\\((.+?)\\) \\)?"       ; refs    (3)
    "\\(.*\\)"                    ; msg     (4)
    "\\)?$")
   "Regexp used to extract elements of git log output with
@@ -1965,20 +1965,21 @@ string which will represent the log line.")
     (cond
      ((looking-at magit-log-oneline-re)
       (let ((chart (match-string 1))
-	    (sha1 (match-string 2))
-	    (msg (match-string 4))
-	    (refs (when (match-string 3)
-		    (remove-if (lambda (s)
-				 (string= s "tag:"))
-			       (split-string (match-string 3) "[(), ]" t)))))
-	(delete-region (point-at-bol) (point-at-eol))
-	(insert (magit-present-log-line chart sha1 refs msg))
-	(goto-char (point-at-bol))
-	(if sha1
-	  (magit-with-section sha1 'commit
-	    (magit-set-section-info sha1)
-	    (forward-line))
-	  (forward-line))))
+            (sha1 (match-string 2))
+            (msg (match-string 4))
+            (refs (when (match-string 3)
+                    (remove-if (lambda (s)
+                                 (or (string= s "tag:")
+                                     (string= s "HEAD"))) ; as of 1.6.6
+                               (split-string (match-string 3) "[(), ]" t)))))
+        (delete-region (point-at-bol) (point-at-eol))
+        (insert (funcall magit-present-log-line-function chart sha1 refs msg))
+        (goto-char (point-at-bol))
+        (if sha1
+            (magit-with-section sha1 'commit
+              (magit-set-section-info sha1)
+              (forward-line))
+          (forward-line))))
      (t
       (forward-line)))
     t))
