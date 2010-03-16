@@ -2966,8 +2966,11 @@ Prefix arg means justify as well."
   (when (magit-section-p stash)
     (setq stash (magit-section-info stash)))
   (let ((dir default-directory)
-	(buf (get-buffer-create "*magit-stash*")))
-    (cond ((equal magit-currently-shown-stash stash)
+	(buf (get-buffer-create "*magit-stash*"))
+        (stash-id (magit-git-string "rev-list" "-1" stash)))
+    (cond ((and (equal magit-currently-shown-stash stash-id)
+                (with-current-buffer buf
+		  (> (length (buffer-string)) 1)))
 	   (let ((win (get-buffer-window buf)))
 	     (cond ((not win)
 		    (display-buffer buf))
@@ -2975,7 +2978,7 @@ Prefix arg means justify as well."
 		    (with-selected-window win
 		      (funcall scroll))))))
 	  (t
-	   (setq magit-currently-shown-stash stash)
+	   (setq magit-currently-shown-stash stash-id)
 	   (display-buffer buf)
 	   (with-current-buffer buf
 	     (set-buffer buf)
@@ -3359,7 +3362,7 @@ Prefix arg means justify as well."
      (pop-to-buffer "*magit-commit*"))
     ((stash)
      (magit-show-stash info)
-     (pop-to-buffer "*magit-diff*"))
+     (pop-to-buffer "*magit-stash*"))
     ((topic)
      (magit-checkout info))))
 
