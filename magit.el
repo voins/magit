@@ -2278,7 +2278,8 @@ string which will represent the log line.")
   (interactive (magit-read-create-branch-args))
   (if (and branch (not (string= branch ""))
 	   parent)
-      (if (zerop (string-match "t/" branch))
+      (let ((topicp
+      (if (string-match "^t/" branch)
 	  (magit-run* (list magit-topgit-executable "create"
 			    branch (magit-rev-to-git parent))
 		      nil nil nil t)
