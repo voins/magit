@@ -127,6 +127,14 @@ Setting this to nil will make it do nothing, setting it to t will arrange things
   :group 'magit
   :type 'boolean)
 
+(defcustom magit-process-connection-type (not (eq system-type 'cygwin))
+  "Connection type used for the git process.
+
+nil mean pipe, it is usually faster and more efficient, and work on cygwin.
+t mean pty, it enable magit to prompt for passphrase when needed."
+  :group 'magit
+  :type 'boolean)
+
 (defface magit-header
   '((t))
   "Face for generic header lines.
@@ -1080,7 +1088,7 @@ Many Magit faces inherit from this one by default."
 		"\n")
 	(cond (nowait
 	       (setq magit-process
-		     (let ((process-connection-type nil))
+		     (let ((process-connection-type magit-process-connection-type))
 		       (apply 'start-file-process cmd buf cmd args)))
 	       (set-process-sentinel magit-process 'magit-process-sentinel)
 	       (set-process-filter magit-process 'magit-process-filter)
