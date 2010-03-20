@@ -1151,13 +1151,12 @@ Many Magit faces inherit from this one by default."
 
 (defun magit-password (proc string)
   "Checks if git/ssh asks for a password and ask the user for it."
-  (when (string-match "^Enter passphrase for key '\\\(.*\\\)': $" string)
+  (when (or (string-match "^Enter passphrase for key '\\\(.*\\\)': $" string)
+	    (string-match "^\\\(moi@toubib\\\)'s password:" string))
     (process-send-string proc
                          (concat (read-passwd
                                   (format "Password for '%s': " (match-string 1 string))
                                   nil) "\n"))))
-
-
 
 (defun magit-process-filter (proc string)
   (save-current-buffer
