@@ -413,22 +413,12 @@ Many Magit faces inherit from this one by default."
 		  dirs))))
 
 (defun magit-get-top-dir (cwd)
-  (let ((cwd (file-name-as-directory (expand-file-name cwd))))
-    (cond ((file-directory-p (concat cwd ".git"))
-	   (expand-file-name cwd))
-	  ((string-match "\\.git/?$" cwd)
-	   (expand-file-name (concat cwd "/..")))
-	  ((file-directory-p cwd)
-	   (let* ((default-directory cwd)
-		  (dir (magit-git-string "rev-parse" "--git-dir")))
-	     (when dir
-	       (let ((dir (file-name-as-directory (file-name-directory dir))))
-		 (if (and (fboundp 'tramp-tramp-file-p)
-			  (tramp-tramp-file-p cwd))
-		     (with-parsed-tramp-file-name cwd tr
-		       (concat (substring cwd 0 (* -1 (length tr-localname)))
-			       dir))
-		     dir))))))))
+  (let ((cwd (expand-file-name cwd)))
+    (when (file-directory-p cwd)
+      (let* ((default-directory cwd)
+             (cdup (magit-git-string "rev-parse" "--show-cdup")))
+        (when cdup
+          (file-name-as-directory (expand-file-name cdup cwd)))))))
 
 (defun magit-get-ref (ref)
   (magit-git-string "symbolic-ref" "-q" ref))
@@ -822,6 +812,12 @@ Many Magit faces inherit from this one by default."
 		 (magit-show-commit (or prev section)))
 	     (goto-char (magit-section-beginning (or prev section))))))))
 
+(defun magit-goto-parent-section ()
+  (interactive)
+  (let ((parent (magit-section-parent (magit-current-section))))
+    (when parent
+      (goto-char (magit-section-beginning parent)))))
+
 (defun magit-goto-section (path)
   (let ((sec (magit-find-section path magit-top-section)))
     (if sec
@@ -897,6 +893,13 @@ Many Magit faces inherit from this one by default."
 (defun magit-expand-section ()
   (interactive)
   (magit-section-hideshow #'magit-section-expand))
+
+(defun magit-toggle-file-section ()
+  "Like `magit-toggle-section' but toggles at file granularity."
+  (interactive)
+  (when (eq 'hunk (first (magit-section-context-type (magit-current-section))))
+    (magit-goto-parent-section))
+  (magit-toggle-section))
 
 (defun magit-toggle-section ()
   (interactive)
@@ -1263,6 +1266,7 @@ Many Magit faces inherit from this one by default."
     (define-key map (kbd "M-H") 'magit-show-only-files-all)
     (define-key map (kbd "M-s") 'magit-show-level-4)
     (define-key map (kbd "M-S") 'magit-show-level-4-all)
+    (define-key map (kbd "<M-left>") 'magit-goto-parent-section)
     (define-key map (kbd "g") 'magit-refresh)
     (define-key map (kbd "G") 'magit-refresh-all)
     (define-key map (kbd "s") 'magit-stage-item)
@@ -1323,6 +1327,9 @@ Many Magit faces inherit from this one by default."
     (define-key map (kbd "E") 'magit-interactive-rebase)
     (define-key map (kbd "V") 'magit-show-branches)
     (define-key map (kbd "q") 'quit-window)
+    (define-key map (kbd "C-c C-m u") 'magit-submodule-update)
+    (define-key map (kbd "C-c C-m s") 'magit-submodule-sync)
+    (define-key map (kbd "C-c C-m i") 'magit-submodule-init)
     map))
 
 (easy-menu-define magit-mode-menu magit-mode-map
@@ -1380,6 +1387,10 @@ Many Magit faces inherit from this one by default."
     ["Push" magit-push t]
     ["Pull" magit-pull t]
     ["Remote update" magit-remote-update t]
+    ("Submodule"
+     ["Submodule update" magit-submodule-update t]
+     ["Submodule init" magit-submodule-init t]
+     ["Submodule sync" magit-submodule-sync t])
     "---"
     ["Display Git output" magit-display-process t]
     ["Quit Magit" quit-window t]))
@@ -2461,10 +2472,16 @@ branch."
       (magit-run-git "reset" (if hard "--hard" "--soft")
 		     (magit-rev-to-git rev))))
 
+(defun magit-reset-head-hard (rev)
+  (interactive (list (magit-read-rev (format "Hard reset head to")
+				     (or (magit-default-rev)
+					 "HEAD"))))
+  (magit-reset-head rev t))
+
 (defun magit-reset-working-tree ()
   (interactive)
-  (if (yes-or-no-p "Discard all uncommitted changes? ")
-      (magit-run-git "reset" "--hard")))
+  (when (yes-or-no-p "Discard all uncommitted changes? ")
+    (magit-reset-head-hard "HEAD")))
 
 ;;; Rewriting
 
@@ -2644,7 +2661,7 @@ branch."
 
 ;;; Log edit mode
 
-(defvar magit-log-edit-map
+(defvar magit-log-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") 'magit-log-edit-commit)
     (define-key map (kbd "C-c C-a") 'magit-log-edit-toggle-amending)
@@ -2670,8 +2687,7 @@ Prefix arg means justify as well."
 
 (define-derived-mode magit-log-edit-mode text-mode "Magit Log Edit"
   (set (make-local-variable 'fill-paragraph-function)
-       'magit-log-fill-paragraph)
-  (use-local-map magit-log-edit-map))
+       'magit-log-fill-paragraph))
 
 (defun magit-log-edit-cleanup ()
   (save-excursion
@@ -3254,7 +3270,8 @@ Prefix arg means justify as well."
 			 'magit-wash-log
 			 "log"
 			 (format "--max-count=%s" magit-log-cutoff-length)
-			 "--pretty=format:* %H %s"
+			 "--graph"
+			 "--pretty=oneline"
 			 (format "%s..%s" head ref)
 			 "--"))))
 		(magit-set-section-info ref section)))))))))
@@ -3502,5 +3519,26 @@ Prefix arg means justify as well."
   (magit-section-action (item info "resolv")
     ((diff)
      (magit-interactive-resolve (cadr info)))))
+
+(defun magit-submodule-update (&optional init)
+  "Update the submodule of the current git repository
+
+With a prefix arg, do a submodule update --init"
+  (interactive "P")
+  (let ((default-directory (magit-get-top-dir default-directory)))
+    (apply #'magit-run-git-async "submodule" "update" (if init '("--init") ()))))
+
+(defun magit-submodule-init ()
+  "Initialize the submodules"
+  (interactive)
+  (let ((default-directory (magit-get-top-dir default-directory)))
+    (magit-run-git-async "submodule" "init")))
+
+(defun magit-submodule-sync ()
+  "Synchronizes submodules' remote URL configuration"
+  (interactive)
+  (let ((default-directory (magit-get-top-dir default-directory)))
+    (magit-run-git-async "submodule" "sync")))
+
 
 (provide 'magit)
